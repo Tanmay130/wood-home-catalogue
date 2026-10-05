@@ -1,5 +1,16 @@
 import catalogueData from '@/data/catalogue.json';
 
+const SUPABASE_CDN_BASE = "https://bhoomezmalueqvfzhwzo.supabase.co/storage/v1/object/public/media";
+
+export function getSupabaseUrl(path: string): string {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+  return `${SUPABASE_CDN_BASE}/${cleanPath}`;
+}
+
 export interface MediaItem {
   id: string;
   type: 'image' | 'video';
@@ -24,17 +35,30 @@ export const STORE_CONFIG = {
   whatsappNumber: null,
 };
 
+// Transform raw JSON data so all media URLs point directly to Supabase CDN
+const formattedCatalogueData: Category[] = (catalogueData as Category[]).map((category) => {
+  if (!category) return category;
+
+  return {
+    ...category,
+    media: (category.media || []).map((item) => ({
+      ...item,
+      url: getSupabaseUrl(item.url),
+    })),
+  };
+});
+
 export const catalogueRepository = {
-  getAllCategories: (): Category[] => catalogueData as Category[],
+  getAllCategories: (): Category[] => formattedCatalogueData,
 
   getCategoryBySlug: (slug: string): Category | undefined =>
-    (catalogueData as Category[]).find(c => c?.slug === slug),
+    formattedCatalogueData.find((c) => c?.slug === slug),
 
   searchCategories: (query: string): Category[] => {
-    const q = query.toLowerCase().trim();
-    if (!q) return catalogueData as Category[];
+    const q = query ? query.toLowerCase().trim() : "";
+    if (!q) return formattedCatalogueData;
 
-    return (catalogueData as Category[]).filter((c) => {
+    return formattedCatalogueData.filter((c) => {
       if (!c) return false;
 
       const nameMatch = c.name?.toLowerCase().includes(q) ?? false;
@@ -43,7 +67,7 @@ export const catalogueRepository = {
 
       return nameMatch || numberMatch || folderMatch;
     });
-  }
+  },
 };
 
 // Standalone export alias for backward compatibility
